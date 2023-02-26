@@ -29,9 +29,7 @@ use crate::{
     dpi::{PhysicalPosition, PhysicalSize, Position, Size},
     error::{ExternalError, NotSupportedError, OsError as RootOsError},
     event::Event,
-    event_loop::{
-        ControlFlow, DeviceEventFilter, EventLoopClosed, EventLoopWindowTarget as RootELW,
-    },
+    event_loop::{ControlFlow, DeviceEvents, EventLoopClosed, EventLoopWindowTarget as RootELW},
     icon::Icon,
     window::{
         CursorGrabMode, CursorIcon, ImePurpose, ResizeDirection, Theme, UserAttentionType,
@@ -854,12 +852,12 @@ impl<T> EventLoopWindowTarget<T> {
     }
 
     #[inline]
-    pub fn set_device_event_filter(&self, _filter: DeviceEventFilter) {
+    pub fn listen_device_events(&self, _filter: DeviceEvents) {
         match *self {
             #[cfg(wayland_platform)]
             EventLoopWindowTarget::Wayland(_) => (),
             #[cfg(x11_platform)]
-            EventLoopWindowTarget::X(ref evlp) => evlp.set_device_event_filter(_filter),
+            EventLoopWindowTarget::X(ref evlp) => evlp.listen_device_events(_filter),
         }
     }
 

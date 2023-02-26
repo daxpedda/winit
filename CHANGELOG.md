@@ -38,6 +38,8 @@ And please only add new entries to the top of this list, right below the `# Unre
 - On macOS, fix wrong focused state on startup.
 - On Windows, fix crash on setting taskbar when using Visual Studio debugger.
 - On macOS, resize simple fullscreen windows on windowDidChangeScreen events.
+- **Breaking** Renamed `EventLoopWindowTarget::set_device_event_filter` to `EventLoopWindowTarget::listen_device_events` and `DeviceEventFilter` to `DeviceEvents` and appropriately reversed its variants.
+- On X11, fix `EventLoopWindowTarget::listen_device_events` effect being reversed.
 
 # 0.28.1
 

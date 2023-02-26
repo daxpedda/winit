@@ -6,7 +6,7 @@ use simple_logger::SimpleLogger;
 use winit::{
     dpi::LogicalSize,
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
-    event_loop::{DeviceEventFilter, EventLoop},
+    event_loop::{DeviceEvents, EventLoop},
     window::{WindowBuilder, WindowButtons},
 };
 
@@ -25,7 +25,7 @@ fn main() {
     eprintln!("  (G) Toggle maximize button");
     eprintln!("  (H) Toggle minimize button");
 
-    event_loop.set_device_event_filter(DeviceEventFilter::Never);
+    event_loop.listen_device_events(DeviceEvents::Always);
 
     event_loop.run(move |event, _, control_flow| {
         control_flow.set_wait();

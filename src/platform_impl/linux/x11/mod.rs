@@ -47,9 +47,7 @@ use self::{
 use crate::{
     error::OsError as RootOsError,
     event::{Event, StartCause},
-    event_loop::{
-        ControlFlow, DeviceEventFilter, EventLoopClosed, EventLoopWindowTarget as RootELW,
-    },
+    event_loop::{ControlFlow, DeviceEvents, EventLoopClosed, EventLoopWindowTarget as RootELW},
     platform_impl::{
         platform::{sticky_exit_callback, WindowId},
         PlatformSpecificWindowBuilderAttributes,
@@ -108,7 +106,7 @@ pub struct EventLoopWindowTarget<T> {
     ime: RefCell<Ime>,
     windows: RefCell<HashMap<WindowId, Weak<UnownedWindow>>>,
     redraw_sender: WakeSender<WindowId>,
-    device_event_filter: Cell<DeviceEventFilter>,
+    device_event_filter: Cell<DeviceEvents>,
     _marker: ::std::marker::PhantomData<T>,
 }
 
@@ -543,14 +541,14 @@ impl<T> EventLoopWindowTarget<T> {
         &self.xconn
     }
 
-    pub fn set_device_event_filter(&self, filter: DeviceEventFilter) {
+    pub fn listen_device_events(&self, filter: DeviceEvents) {
         self.device_event_filter.set(filter);
     }
 
     /// Update the device event filter based on window focus.
     pub fn update_device_event_filter(&self, focus: bool) {
-        let filter_events = self.device_event_filter.get() == DeviceEventFilter::Never
-            || (self.device_event_filter.get() == DeviceEventFilter::Unfocused && !focus);
+        let filter_events = self.device_event_filter.get() == DeviceEvents::Never
+            || (self.device_event_filter.get() == DeviceEvents::WhenFocused && !focus);
 
         let mut mask = 0;
         if !filter_events {
