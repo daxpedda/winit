@@ -87,11 +87,11 @@ pub fn set_canvas_size(raw: &HtmlCanvasElement, size: Size) {
     let physical_size = size.to_physical::<u32>(scale_factor);
     let logical_size = size.to_logical::<f64>(scale_factor);
 
-    raw.set_width(physical_size.width);
-    raw.set_height(physical_size.height);
+    //raw.set_width(physical_size.width);
+    //raw.set_height(physical_size.height);
 
-    set_canvas_style_property(raw, "width", &format!("{}px", logical_size.width));
-    set_canvas_style_property(raw, "height", &format!("{}px", logical_size.height));
+    //set_canvas_style_property(raw, "width", &format!("{}px", logical_size.width));
+    //set_canvas_style_property(raw, "height", &format!("{}px", logical_size.height));
 }
 
 pub fn set_canvas_style_property(raw: &HtmlCanvasElement, property: &str, value: &str) {
