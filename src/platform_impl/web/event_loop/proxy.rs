@@ -11,7 +11,7 @@ impl<T: 'static> EventLoopProxy<T> {
     pub fn new(runner: runner::Shared<T>) -> Self {
         Self {
             runner: MainThreadSafe::new(runner, |runner, event| {
-                runner.borrow().send_event(Event::UserEvent(event))
+                runner.send_event(Event::UserEvent(event))
             })
             .unwrap(),
         }

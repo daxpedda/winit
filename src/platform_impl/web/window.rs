@@ -469,7 +469,7 @@ impl Window {
 
 impl Drop for Window {
     fn drop(&mut self) {
-        self.inner.dispatch_mut(|inner| {
+        self.inner.dispatch(|inner| {
             if let Some(destroy_fn) = inner.destroy_fn.take() {
                 destroy_fn();
             }
