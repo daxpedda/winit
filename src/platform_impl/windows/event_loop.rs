@@ -304,7 +304,7 @@ impl<T: 'static> EventLoop<T> {
     pub fn create_proxy(&self) -> EventLoopProxy<T> {
         EventLoopProxy {
             target_window: self.window_target.p.thread_msg_target,
-            event_send: self.thread_msg_sender.clone(),
+            event_send: Mutex::new(self.thread_msg_sender.clone()),
         }
     }
 }
@@ -573,7 +573,7 @@ type ThreadExecFn = Box<Box<dyn FnMut()>>;
 
 pub struct EventLoopProxy<T: 'static> {
     target_window: HWND,
-    event_send: Sender<T>,
+    event_send: Mutex<Sender<T>>,
 }
 unsafe impl<T: Send + 'static> Send for EventLoopProxy<T> {}
 
@@ -581,7 +581,7 @@ impl<T: 'static> Clone for EventLoopProxy<T> {
     fn clone(&self) -> Self {
         Self {
             target_window: self.target_window,
-            event_send: self.event_send.clone(),
+            event_send: Mutex::new(self.event_send.lock().unwrap().clone()),
         }
     }
 }
@@ -590,7 +590,7 @@ impl<T: 'static> EventLoopProxy<T> {
     pub fn send_event(&self, event: T) -> Result<(), EventLoopClosed<T>> {
         unsafe {
             if PostMessageW(self.target_window, USER_EVENT_MSG_ID.get(), 0, 0) != false.into() {
-                self.event_send.send(event).ok();
+                self.event_send.lock().unwrap().send(event).ok();
                 Ok(())
             } else {
                 Err(EventLoopClosed(event))
