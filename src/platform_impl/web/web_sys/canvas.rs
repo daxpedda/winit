@@ -417,15 +417,18 @@ impl Common {
         F: 'static + FnMut(E),
     {
         let wants_fullscreen = self.wants_fullscreen.clone();
+        let window = self.window.clone();
         let canvas = self.raw.clone();
 
         self.add_event(event_name, move |event: E| {
             handler(event);
 
             if *wants_fullscreen.borrow() {
-                canvas
-                    .request_fullscreen()
-                    .expect("Failed to enter fullscreen");
+                if !super::is_fullscreen(&window, &canvas) {
+                    canvas
+                        .request_fullscreen()
+                        .expect("Failed to enter fullscreen");
+                }
                 *wants_fullscreen.borrow_mut() = false;
             }
         })
@@ -444,15 +447,18 @@ impl Common {
         F: 'static + FnMut(MouseEvent),
     {
         let wants_fullscreen = self.wants_fullscreen.clone();
+        let window = self.window.clone();
         let canvas = self.raw.clone();
 
         let closure = Closure::wrap(Box::new(move |event: MouseEvent| {
             handler(event);
 
             if *wants_fullscreen.borrow() {
-                canvas
-                    .request_fullscreen()
-                    .expect("Failed to enter fullscreen");
+                if !super::is_fullscreen(&window, &canvas) {
+                    canvas
+                        .request_fullscreen()
+                        .expect("Failed to enter fullscreen");
+                }
                 *wants_fullscreen.borrow_mut() = false;
             }
         }) as Box<dyn FnMut(_)>);
@@ -468,6 +474,7 @@ impl Common {
     }
 
     pub fn request_fullscreen(&self) {
+        let _ = self.raw.request_fullscreen();
         *self.wants_fullscreen.borrow_mut() = true;
     }
 
