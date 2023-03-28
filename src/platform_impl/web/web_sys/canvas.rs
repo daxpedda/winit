@@ -11,6 +11,9 @@ use crate::platform_impl::{OsError, PlatformSpecificWindowBuilderAttributes};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use js_sys::Promise;
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
 use wasm_bindgen::{closure::Closure, JsCast};
 use web_sys::{
     AddEventListenerOptions, Event, FocusEvent, HtmlCanvasElement, KeyboardEvent,
@@ -424,11 +427,9 @@ impl Common {
             handler(event);
 
             if *wants_fullscreen.borrow() {
-                if !super::is_fullscreen(&window, &canvas) {
-                    canvas
-                        .request_fullscreen()
-                        .expect("Failed to enter fullscreen");
-                }
+                canvas
+                    .request_fullscreen()
+                    .expect("Failed to enter fullscreen");
                 *wants_fullscreen.borrow_mut() = false;
             }
         })
@@ -454,11 +455,9 @@ impl Common {
             handler(event);
 
             if *wants_fullscreen.borrow() {
-                if !super::is_fullscreen(&window, &canvas) {
-                    canvas
-                        .request_fullscreen()
-                        .expect("Failed to enter fullscreen");
-                }
+                canvas
+                    .request_fullscreen()
+                    .expect("Failed to enter fullscreen");
                 *wants_fullscreen.borrow_mut() = false;
             }
         }) as Box<dyn FnMut(_)>);
@@ -474,8 +473,34 @@ impl Common {
     }
 
     pub fn request_fullscreen(&self) {
-        let _ = self.raw.request_fullscreen();
-        *self.wants_fullscreen.borrow_mut() = true;
+        #[wasm_bindgen]
+        extern "C" {
+            type ElementExt;
+
+            #[wasm_bindgen(catch, method, js_class = "Element", js_name = requestFullscreen)]
+            fn request_fullscreen(this: &ElementExt) -> Result<JsValue, JsValue>;
+
+            type PromiseExt;
+
+            #[wasm_bindgen(method)]
+            fn catch(this: &PromiseExt, cb: &JsValue) -> Promise;
+        }
+
+        let raw: &ElementExt = self.raw.unchecked_ref();
+
+        // This should return a `Promise`, but some Safari <v16.4 is not up-to-date with the spec.
+        match raw.request_fullscreen() {
+            Ok(value) if !value.is_undefined() => {
+                let promise: PromiseExt = value.unchecked_into();
+                let wants_fullscreen = self.wants_fullscreen.clone();
+                let cb = Closure::once_into_js(move || *wants_fullscreen.borrow_mut() = true);
+                // We use a custom `catch` function here because we don't
+                // want to deal with an async cleanup of the `Closure`.
+                let _ = promise.catch(&cb);
+            }
+            // We are on Safari, let's try again on the next transient activation.
+            _ => *self.wants_fullscreen.borrow_mut() = true,
+        }
     }
 
     pub fn is_fullscreen(&self) -> bool {
