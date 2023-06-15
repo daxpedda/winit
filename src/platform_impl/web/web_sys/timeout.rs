@@ -1,11 +1,10 @@
-use once_cell::unsync::OnceCell;
 use std::cell::Cell;
 use std::rc::Rc;
 use std::time::Duration;
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
-use wasm_bindgen::JsValue;
+
+use super::event;
 
 #[derive(Debug)]
 pub struct Timeout {
@@ -68,7 +67,7 @@ impl IdleCallback {
             f();
         }) as Box<dyn FnMut()>);
 
-        let handle = if has_idle_callback_support(&window) {
+        let handle = if event::has_idle_callback_support(&window) {
             Handle::IdleCallback(
                 window
                     .request_idle_callback(closure.as_ref().unchecked_ref())
@@ -89,6 +88,10 @@ impl IdleCallback {
             _closure: closure,
         }
     }
+
+    pub fn fired(&self) -> bool {
+        self.fired.get()
+    }
 }
 
 impl Drop for IdleCallback {
@@ -100,25 +103,4 @@ impl Drop for IdleCallback {
             }
         }
     }
-}
-
-fn has_idle_callback_support(window: &web_sys::Window) -> bool {
-    thread_local! {
-        static IDLE_CALLBACK_SUPPORT: OnceCell<bool> = OnceCell::new();
-    }
-
-    IDLE_CALLBACK_SUPPORT.with(|support| {
-        *support.get_or_init(|| {
-            #[wasm_bindgen]
-            extern "C" {
-                type IdleCallbackSupport;
-
-                #[wasm_bindgen(method, getter, js_name = requestIdleCallback)]
-                fn has_request_idle_callback(this: &IdleCallbackSupport) -> JsValue;
-            }
-
-            let support: &IdleCallbackSupport = window.unchecked_ref();
-            !support.has_request_idle_callback().is_undefined()
-        })
-    })
 }

@@ -5,7 +5,7 @@ use crate::event::{
     DeviceEvent, DeviceId as RootDeviceId, ElementState, Event, RawKeyEvent, StartCause,
 };
 use crate::event_loop::{ControlFlow, DeviceEvents};
-use crate::platform_impl::platform::backend::EventListenerHandle;
+use crate::platform_impl::platform::backend::{EventListenerHandle, IdleCallback};
 use crate::window::WindowId;
 
 use std::sync::atomic::Ordering;
@@ -35,6 +35,8 @@ type OnEventHandle<T> = RefCell<Option<EventListenerHandle<dyn FnMut(T)>>>;
 
 pub struct Execution<T: 'static> {
     runner: RefCell<RunnerEnum<T>>,
+    has_run_this_loop: Cell<bool>,
+    idle_callback: RefCell<Option<IdleCallback>>,
     events: RefCell<VecDeque<EventWrapper<T>>>,
     id: RefCell<u32>,
     window: web_sys::Window,
@@ -111,13 +113,17 @@ impl<T: 'static> Runner<T> {
         let is_closed = matches!(*control, ControlFlow::ExitWithCode(_));
 
         match event.into() {
-            EventWrapper::Event(event) => (self.event_handler)(event, control),
+            EventWrapper::Event(event) => {
+                runner.0.has_run_this_loop.set(true);
+                (self.event_handler)(event, control)
+            }
             EventWrapper::ScaleChange {
                 canvas,
                 size,
                 scale,
             } => {
                 if let Some(canvas) = canvas.upgrade() {
+                    runner.0.has_run_this_loop.set(true);
                     canvas.borrow().handle_scale_change(
                         runner,
                         |event| (self.event_handler)(event, control),
@@ -139,6 +145,8 @@ impl<T: 'static> Shared<T> {
     pub fn new() -> Self {
         Shared(Rc::new(Execution {
             runner: RefCell::new(RunnerEnum::Pending),
+            has_run_this_loop: Cell::new(false),
+            idle_callback: RefCell::new(None),
             events: RefCell::new(VecDeque::new()),
             #[allow(clippy::disallowed_methods)]
             window: web_sys::window().expect("only callable from inside the `Window`"),
@@ -382,21 +390,21 @@ impl<T: 'static> Shared<T> {
         self.send_events::<EventWrapper<T>>(iter::empty());
     }
 
-    pub fn init(&self) {
+    fn init(&self) {
         // NB: For consistency all platforms must emit a 'resumed' event even though web
         // applications don't themselves have a formal suspend/resume lifecycle.
         self.run_until_cleared([Event::NewEvents(StartCause::Init), Event::Resumed].into_iter());
     }
 
     // Run the polling logic for the Poll ControlFlow, which involves clearing the queue
-    pub fn poll(&self) {
+    fn poll(&self) {
         let start_cause = Event::NewEvents(StartCause::Poll);
         self.run_until_cleared(iter::once(start_cause));
     }
 
     // Run the logic for waking from a WaitUntil, which involves clearing the queue
     // Generally there shouldn't be events built up when this is called
-    pub fn resume_time_reached(&self, start: Instant, requested_resume: Instant) {
+    fn resume_time_reached(&self, start: Instant, requested_resume: Instant) {
         let start_cause = Event::NewEvents(StartCause::ResumeTimeReached {
             start,
             requested_resume,
@@ -464,11 +472,18 @@ impl<T: 'static> Shared<T> {
             // If we're in the exit state, don't do event processing
             None => return,
         };
+        // Take out the start event if we are coming from a debounced state.
+        let start_event = self
+            .0
+            .idle_callback
+            .borrow()
+            .is_none()
+            .then_some(EventWrapper::from(Event::NewEvents(start_cause)));
         // Take the start event, then the events provided to this function, and run an iteration of
         // the event loop
-        let start_event = Event::NewEvents(start_cause);
-        let events =
-            iter::once(EventWrapper::from(start_event)).chain(events.into_iter().map(Into::into));
+        let events = start_event
+            .into_iter()
+            .chain(events.into_iter().map(Into::into));
         self.run_until_cleared(events);
     }
 
@@ -500,6 +515,31 @@ impl<T: 'static> Shared<T> {
         for event in events {
             self.handle_event(event.into(), &mut control);
         }
+
+        if self.0.has_run_this_loop.get()
+            && backend::event::has_idle_callback_support(self.window())
+        {
+            self.0.has_run_this_loop.set(false);
+
+            let mut idle_callback = self.0.idle_callback.borrow_mut();
+
+            if idle_callback
+                .as_ref()
+                .filter(|idle_callback| !idle_callback.fired())
+                .is_none()
+            {
+                let cloned = self.clone();
+                *idle_callback = Some(IdleCallback::new(self.window().clone(), move || {
+                    warn!("came from debounce");
+                    cloned.run_until_cleared(iter::empty::<EventWrapper<T>>())
+                }));
+            }
+            warn!("debounced");
+            return;
+        }
+
+        *self.0.idle_callback.borrow_mut() = None;
+
         self.process_destroy_pending_windows(&mut control);
         self.handle_event(Event::MainEventsCleared, &mut control);
 

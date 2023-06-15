@@ -288,3 +288,26 @@ pub fn has_coalesced_events_support(event: &PointerEvent) -> bool {
         })
     })
 }
+
+// TODO: Remove when Safari supports `requestIdleCallback`.
+// See <https://bugs.webkit.org/show_bug.cgi?id=164193>.
+pub fn has_idle_callback_support(window: &web_sys::Window) -> bool {
+    thread_local! {
+        static IDLE_CALLBACK_SUPPORT: OnceCell<bool> = OnceCell::new();
+    }
+
+    IDLE_CALLBACK_SUPPORT.with(|support| {
+        *support.get_or_init(|| {
+            #[wasm_bindgen]
+            extern "C" {
+                type IdleCallbackSupport;
+
+                #[wasm_bindgen(method, getter, js_name = requestIdleCallback)]
+                fn has_request_idle_callback(this: &IdleCallbackSupport) -> JsValue;
+            }
+
+            let support: &IdleCallbackSupport = window.unchecked_ref();
+            !support.has_request_idle_callback().is_undefined()
+        })
+    })
+}

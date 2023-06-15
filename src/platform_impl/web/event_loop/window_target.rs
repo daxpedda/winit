@@ -714,7 +714,6 @@ impl<T> EventLoopWindowTarget<T> {
                             window_id: RootWindowId(id),
                             event: WindowEvent::Resized(new_size),
                         });
-                        runner.request_redraw(RootWindowId(id));
                     }
                 }
             },
