@@ -9,7 +9,9 @@ PR's changelog entry would go into the wrong section).
 And please only add new entries to the top of this list, right below the `#
 Unreleased` header.
 
-# Unreleased
+# 0.29.10
+
+- On iOS, fix calling `Window::request_redraw()` from `WindowEvent:RedrawRequested`.
 
 # 0.29.9
 
