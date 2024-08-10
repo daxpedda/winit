@@ -772,7 +772,7 @@ impl EventLoop {
 
     pub fn run_app_on_demand<A: ApplicationHandler>(
         &mut self,
-        app: A,
+        app: &mut A,
     ) -> Result<(), EventLoopError> {
         x11_or_wayland!(match self; EventLoop(evlp) => evlp.run_app_on_demand(app))
     }
@@ -780,7 +780,7 @@ impl EventLoop {
     pub fn pump_app_events<A: ApplicationHandler>(
         &mut self,
         timeout: Option<Duration>,
-        app: A,
+        app: &mut A,
     ) -> PumpStatus {
         x11_or_wayland!(match self; EventLoop(evlp) => evlp.pump_app_events(timeout, app))
     }

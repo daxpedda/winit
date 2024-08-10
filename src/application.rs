@@ -7,7 +7,7 @@ use crate::event_loop::ActiveEventLoop;
 use crate::window::WindowId;
 
 /// The handler of the application events.
-pub trait ApplicationHandler {
+pub trait ApplicationHandler: AsAny<dyn Any> {
     /// Emitted when new events arrive from the OS to be processed.
     ///
     /// This is a useful place to put code that should be done before you start processing
@@ -327,23 +327,10 @@ pub trait ApplicationHandler {
     fn memory_warning(&mut self, event_loop: &dyn ActiveEventLoop) {
         let _ = event_loop;
     }
-
-    /// Get the [`ApplicationHandler`] as [`Any`].
-    ///
-    /// This is useful for downcasting to a concrete application type.
-    #[inline(always)]
-    fn as_any(&mut self) -> Option<&mut dyn Any> {
-        None
-    }
 }
 
 #[deny(clippy::missing_trait_methods)]
-impl<A: ?Sized + ApplicationHandler> ApplicationHandler for &mut A {
-    #[inline(always)]
-    fn as_any(&mut self) -> Option<&mut dyn Any> {
-        (**self).as_any()
-    }
-
+impl<A: ?Sized + ApplicationHandler + 'static> ApplicationHandler for Box<A> {
     #[inline]
     fn new_events(&mut self, event_loop: &dyn ActiveEventLoop, cause: StartCause) {
         (**self).new_events(event_loop, cause);
@@ -410,75 +397,33 @@ impl<A: ?Sized + ApplicationHandler> ApplicationHandler for &mut A {
     }
 }
 
-#[deny(clippy::missing_trait_methods)]
-impl<A: ?Sized + ApplicationHandler> ApplicationHandler for Box<A> {
-    #[inline(always)]
-    fn as_any(&mut self) -> Option<&mut dyn Any> {
-        (**self).as_any()
-    }
+trait UpcastFrom<T: ?Sized> {
+    fn any_from(value: &T) -> &Self;
+    fn any_mut_from(value: &mut T) -> &mut Self;
+}
 
-    #[inline]
-    fn new_events(&mut self, event_loop: &dyn ActiveEventLoop, cause: StartCause) {
-        (**self).new_events(event_loop, cause);
-    }
+pub trait AsAny<U: ?Sized> {
+    fn as_any(&self) -> &U;
+    fn as_any_mut(&mut self) -> &mut U;
+}
 
-    #[inline]
-    fn resumed(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).resumed(event_loop);
+impl<T: ?Sized, U: ?Sized> AsAny<U> for T
+where
+    U: UpcastFrom<T>,
+{
+    fn as_any(&self) -> &U {
+        U::any_from(self)
     }
-
-    #[inline]
-    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).can_create_surfaces(event_loop);
+    fn as_any_mut(&mut self) -> &mut U {
+        U::any_mut_from(self)
     }
+}
 
-    #[inline]
-    fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).proxy_wake_up(event_loop);
+impl<T: Any> UpcastFrom<T> for dyn Any {
+    fn any_from(value: &T) -> &dyn Any {
+        value
     }
-
-    #[inline]
-    fn window_event(
-        &mut self,
-        event_loop: &dyn ActiveEventLoop,
-        window_id: WindowId,
-        event: WindowEvent,
-    ) {
-        (**self).window_event(event_loop, window_id, event);
-    }
-
-    #[inline]
-    fn device_event(
-        &mut self,
-        event_loop: &dyn ActiveEventLoop,
-        device_id: DeviceId,
-        event: DeviceEvent,
-    ) {
-        (**self).device_event(event_loop, device_id, event);
-    }
-
-    #[inline]
-    fn about_to_wait(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).about_to_wait(event_loop);
-    }
-
-    #[inline]
-    fn suspended(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).suspended(event_loop);
-    }
-
-    #[inline]
-    fn destroy_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).destroy_surfaces(event_loop);
-    }
-
-    #[inline]
-    fn exiting(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).exiting(event_loop);
-    }
-
-    #[inline]
-    fn memory_warning(&mut self, event_loop: &dyn ActiveEventLoop) {
-        (**self).memory_warning(event_loop);
+    fn any_mut_from(value: &mut T) -> &mut dyn Any {
+        value
     }
 }

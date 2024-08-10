@@ -67,8 +67,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     }
 
-    let app = Application::new(&event_loop, receiver, sender);
+    let mut app = Application::new(&event_loop, receiver, sender);
     event_loop.register_wayland_callback::<Application>();
+
+    fn test<T: WaylandApplicationHandler>(app: &mut dyn ApplicationHandler) {
+        app.as_any_mut().downcast_mut::<T>().unwrap().wayland_callback();
+    }
+
+    test::<Application>(&mut app);
+
     Ok(event_loop.run_app(app)?)
 }
 
@@ -373,11 +380,6 @@ impl Application {
 }
 
 impl ApplicationHandler for Application {
-    fn as_any(&mut self) -> Option<&mut dyn std::any::Any> {
-        println!("Called");
-        Some(self)
-    }
-
     fn proxy_wake_up(&mut self, event_loop: &dyn ActiveEventLoop) {
         while let Ok(action) = self.receiver.try_recv() {
             self.handle_action_from_proxy(event_loop, action)

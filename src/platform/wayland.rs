@@ -58,11 +58,7 @@ impl EventLoopExtWayland for EventLoop {
         };
 
         event_loop.wayland_callback.set(Some(|app: &mut dyn ApplicationHandler| {
-            app.as_any()
-                .expect("as_any_mut is not implemented")
-                .downcast_mut::<T>()
-                .unwrap()
-                .wayland_callback()
+            app.as_any_mut().downcast_mut::<T>().unwrap().wayland_callback()
         }));
     }
 }

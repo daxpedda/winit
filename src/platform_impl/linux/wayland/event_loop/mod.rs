@@ -156,17 +156,17 @@ impl EventLoop {
         Ok(event_loop)
     }
 
-    pub fn run_app<A: ApplicationHandler>(mut self, app: A) -> Result<(), EventLoopError> {
-        self.run_app_on_demand(app)
+    pub fn run_app<A: ApplicationHandler>(mut self, mut app: A) -> Result<(), EventLoopError> {
+        self.run_app_on_demand(&mut app)
     }
 
     pub fn run_app_on_demand<A: ApplicationHandler>(
         &mut self,
-        mut app: A,
+        app: &mut A,
     ) -> Result<(), EventLoopError> {
         self.active_event_loop.clear_exit();
         let exit = loop {
-            match self.pump_app_events(None, &mut app) {
+            match self.pump_app_events(None, app) {
                 PumpStatus::Exit(0) => {
                     break Ok(());
                 },
@@ -191,19 +191,19 @@ impl EventLoop {
     pub fn pump_app_events<A: ApplicationHandler>(
         &mut self,
         timeout: Option<Duration>,
-        mut app: A,
+        app: &mut A,
     ) -> PumpStatus {
         if !self.loop_running {
             self.loop_running = true;
 
             // Run the initial loop iteration.
-            self.single_iteration(&mut app, StartCause::Init);
+            self.single_iteration(app, StartCause::Init);
         }
 
         // Consider the possibility that the `StartCause::Init` iteration could
         // request to Exit.
         if !self.exiting() {
-            self.poll_events_with_timeout(timeout, &mut app);
+            self.poll_events_with_timeout(timeout, app);
         }
         if let Some(code) = self.exit_code() {
             self.loop_running = false;
@@ -588,6 +588,7 @@ pub struct ActiveEventLoop {
     /// Connection to the wayland server.
     pub connection: Connection,
 
+    #[allow(clippy::type_complexity)]
     pub wayland_callback: Cell<Option<fn(&mut dyn ApplicationHandler)>>,
 }
 
